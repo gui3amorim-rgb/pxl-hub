@@ -1089,6 +1089,123 @@ local function func_05367599(p0)
         end
 
         return
+-- === BLOX FRUITS TAB ===
+local BFTab = Window:CreateTab("Blox Fruits")
+BFTab:CreateSection("Blox Fruits | Auto Farm Completo")
 
-    end
+-- Hook de redirecionamento — roda UMA VEZ, antes do BF script
+local function instalarHooks()
+    if getgenv()._pxl_hooks_installed then return end
+    getgenv()._pxl_hooks_installed = true
+
+    local httpGetOriginal = game.HttpGet
+
+    local whitelistFake = [[
+return {
+    ["awdafaw1dawd"] = true,
+    ["vcsk0"] = true,
+    ["TOXIC_SOLOZ"] = true,
+    ["AstralX0"] = true,
+    ["XXMALAYSIA_GGG"] = true,
+    ["Aperopoh"] = true,
+}
+]]
+
+    local blacklistFake = [[
+return {}
+]]
+
+    game.HttpGet = newcclosure(function(self, url, ...)
+        if type(url) == "string" then
+            -- whitelist do AstralHub → devolve com teu user dentro
+            if url:find("AstralHub/main/Whitelist.lua") then
+                return whitelistFake
+            end
+            -- blacklist do AstralHub → devolve vazio
+            if url:find("AstralHub/main/Blacklist.lua") then
+                return blacklistFake
+            end
+            -- whitelist hardcoded do main.lua do BF (mesma URL base)
+            if url:find("Whitelist.lua") and url:find("AstralHub") then
+                return whitelistFake
+            end
+        end
+        return httpGetOriginal(self, url, ...)
+    end)
 end
+
+BFTab:CreateButton({
+    Name = "⚡ Carregar Blox Fruits Script Completo",
+    Callback = function()
+        instalarHooks()
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/gui3amorim-rgb/pxl-hub/main/BloxFruits.lua"))()
+        end)
+        if not ok then
+            Rayfield:Notify({
+                Title = "Pixel Hub | Erro BF",
+                Content = tostring(err):sub(1, 200),
+                Duration = 8
+            })
+        else
+            Rayfield:Notify({
+                Title = "Pixel Hub",
+                Content = "Blox Fruits carregado. UI do script aparece separada.",
+                Duration = 5
+            })
+        end
+    end
+})
+
+BFTab:CreateButton({
+    Name = "Esconder Pixel Hub (após carregar BF)",
+    Callback = function()
+        local gui = gethui and gethui() or game:GetService("CoreGui")
+        for _, child in pairs(gui:GetDescendants()) do
+            if child:IsA("ScreenGui") and child.Name:lower():find("rayfield") then
+                child.Enabled = false
+            end
+        end
+    end
+})
+
+BFTab:CreateButton({
+    Name = "Mostrar Pixel Hub",
+    Callback = function()
+        local gui = gethui and gethui() or game:GetService("CoreGui")
+        for _, child in pairs(gui:GetDescendants()) do
+            if child:IsA("ScreenGui") and child.Name:lower():find("rayfield") then
+                child.Enabled = true
+            end
+        end
+    end
+})
+
+BFTab:CreateSection("Hubs BF Externos (fallback)")
+
+BFTab:CreateButton({
+    Name = "HoHo Hub",
+    Callback = function()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/acsu123/HOHO_H/main/Loading_UI"))()
+        end)
+    end
+})
+
+BFTab:CreateButton({
+    Name = "ThunderZ",
+    Callback = function()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/StringV2/StringHub/main/BF.txt", true))()
+        end)
+    end
+})
+
+BFTab:CreateButton({
+    Name = "Raito (source original)",
+    Callback = function()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/gui3amorim-rgb/pxl-hub/main/BloxFruits.lua"))()
+        end)
+    end
+})
