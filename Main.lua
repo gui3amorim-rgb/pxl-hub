@@ -6,6 +6,26 @@ local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 local v = localPlayer.Name
 
+-- === LIMPEZA DE UIs ÓRFÃS DE EXECUÇÕES ANTERIORES ===
+local function limparUIsAntigas()
+    local alvos = {}
+    if gethui then table.insert(alvos, gethui()) end
+    table.insert(alvos, game:GetService("CoreGui"))
+    table.insert(alvos, game:GetService("Players").LocalPlayer)
+    for _, gui in pairs(alvos) do
+        for _, child in pairs(gui:GetChildren()) do
+            if child:IsA("ScreenGui") then
+                local nome = child.Name:lower()
+                if nome == "screengui" or nome == "rayfield-old" or nome == "togglegui_v3" or nome:find("kavo") then
+                    pcall(function() child:Destroy() end)
+                end
+            end
+        end
+    end
+end
+limparUIsAntigas()
+
+-- === WINDOW ===
 local Window = Rayfield:CreateWindow({
     Name = "Pixel Hub | V3",
     LoadingTitle = "Pixel Hub",
@@ -18,7 +38,7 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
--- === UI Toggle Button ===
+-- === BOTÃO TOGGLE DA UI ===
 local screenGui = Instance.new("ScreenGui")
 local textButton = Instance.new("TextButton")
 local iconImage = Instance.new("ImageLabel")
@@ -55,9 +75,18 @@ iconImage.Active = false
 local uiVisible = true
 local function setRayfieldVisible(state)
     local gui = gethui and gethui() or game:GetService("CoreGui")
-    for _, child in pairs(gui:GetDescendants()) do
-        if child:IsA("ScreenGui") and child.Name:lower():find("rayfield") then
+    local achou = false
+    for _, child in pairs(gui:GetChildren()) do
+        if child:IsA("ScreenGui") and child.Name:lower():find("rayfield") and not child.Name:lower():find("old") then
             child.Enabled = state
+            achou = true
+        end
+    end
+    if not achou then
+        for _, child in pairs(game:GetService("CoreGui"):GetChildren()) do
+            if child:IsA("ScreenGui") and child.Name:lower():find("rayfield") and not child.Name:lower():find("old") then
+                child.Enabled = state
+            end
         end
     end
 end
@@ -108,15 +137,154 @@ HomeTab:CreateKeybind({
     end
 })
 
+HomeTab:CreateSection("Feedback")
+HomeTab:CreateInput({
+    Name = "Report Bugs",
+    PlaceholderText = "descreve o bug",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(t)
+        if t and t ~= "" then print("[Pixel Hub] Report:", t) end
+    end
+})
+HomeTab:CreateInput({
+    Name = "Suggestions",
+    PlaceholderText = "sugestão",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(t)
+        if t and t ~= "" then print("[Pixel Hub] Suggestion:", t) end
+    end
+})
+HomeTab:CreateInput({
+    Name = "Feedback",
+    PlaceholderText = "feedback",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(t)
+        if t and t ~= "" then print("[Pixel Hub] Feedback:", t) end
+    end
+})
+
 -- === PLAYERS ===
 PlayersTab:CreateSection("Player")
-PlayersTab:CreateInput({Name = "Set WalkSpeed", PlaceholderText = "50", RemoveTextAfterFocusLost = true,
-    Callback = function(t) pcall(function() localPlayer.Character.Humanoid.WalkSpeed = tonumber(t) or 16 end) end})
-PlayersTab:CreateInput({Name = "Set JumpPower", PlaceholderText = "100", RemoveTextAfterFocusLost = true,
-    Callback = function(t) pcall(function() localPlayer.Character.Humanoid.JumpPower = tonumber(t) or 50 end) end})
-PlayersTab:CreateSlider({Name = "FOV", Range = {70, 120}, Increment = 1, CurrentValue = 70,
-    Callback = function(val) workspace.CurrentCamera.FieldOfView = val end})
-PlayersTab:CreateToggle({Name = "Noclip", CurrentValue = false,
+PlayersTab:CreateToggle({
+    Name = "Character Highlight",
+    CurrentValue = false,
+    Callback = function(state)
+        getgenv().enabled = state
+        getgenv().filluseteamcolor = true
+        getgenv().outlineuseteamcolor = true
+        getgenv().fillcolor = Color3.new(0, 0, 0)
+        getgenv().outlinecolor = Color3.new(1, 1, 1)
+        getgenv().filltrans = 0.5
+        getgenv().outlinetrans = 0.5
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/Highlight-ESP.lua"))()
+        end)
+    end
+})
+
+PlayersTab:CreateInput({
+    Name = "Hitbox Size",
+    PlaceholderText = "ex: 15",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(t) getgenv().HitboxSize = tonumber(t) or 15 end
+})
+
+PlayersTab:CreateToggle({
+    Name = "Hitbox (Everyone)",
+    CurrentValue = false,
+    Callback = function(state)
+        getgenv().HitboxEveryone = state
+        if state then
+            task.spawn(function()
+                while getgenv().HitboxEveryone do
+                    task.wait()
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if plr ~= localPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                local hrp = plr.Character.HumanoidRootPart
+                                local s = getgenv().HitboxSize or 15
+                                hrp.Size = Vector3.new(s, s, s)
+                                hrp.Transparency = 0.7
+                                hrp.BrickColor = BrickColor.new("Really black")
+                                hrp.Material = "Neon"
+                                hrp.CanCollide = false
+                            end)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+PlayersTab:CreateToggle({
+    Name = "Hitbox (Enemy Only)",
+    CurrentValue = false,
+    Callback = function(state)
+        getgenv().HitboxEnemyOnly = state
+        if state then
+            task.spawn(function()
+                while getgenv().HitboxEnemyOnly do
+                    task.wait()
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if plr.Team ~= localPlayer.Team and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                local hrp = plr.Character.HumanoidRootPart
+                                local s = getgenv().HitboxSize or 15
+                                hrp.Size = Vector3.new(s, s, s)
+                                hrp.Transparency = 0.7
+                                hrp.BrickColor = BrickColor.new("Really black")
+                                hrp.Material = "Neon"
+                                hrp.CanCollide = false
+                            end)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+PlayersTab:CreateInput({
+    Name = "Teleport To Player",
+    PlaceholderText = "username",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(t)
+        local alvo = Players:FindFirstChild(t)
+        if alvo and alvo.Character and alvo.Character:FindFirstChild("HumanoidRootPart") then
+            localPlayer.Character.HumanoidRootPart.CFrame = alvo.Character.HumanoidRootPart.CFrame
+        end
+    end
+})
+
+PlayersTab:CreateSection("LocalPlayer")
+PlayersTab:CreateInput({
+    Name = "Set WalkSpeed",
+    PlaceholderText = "ex: 50",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(t)
+        pcall(function() localPlayer.Character.Humanoid.WalkSpeed = tonumber(t) or 16 end)
+    end
+})
+PlayersTab:CreateInput({
+    Name = "Set JumpPower",
+    PlaceholderText = "ex: 100",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(t)
+        pcall(function() localPlayer.Character.Humanoid.JumpPower = tonumber(t) or 50 end)
+    end
+})
+PlayersTab:CreateSlider({
+    Name = "FOV",
+    Range = {70, 120},
+    Increment = 1,
+    Suffix = " fov",
+    CurrentValue = 70,
+    Callback = function(val) workspace.CurrentCamera.FieldOfView = val end
+})
+PlayersTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
     Callback = function(state)
         _G.Noclip = state
         if state then
@@ -131,13 +299,88 @@ PlayersTab:CreateToggle({Name = "Noclip", CurrentValue = false,
                 end
             end)
         end
-    end})
-PlayersTab:CreateToggle({Name = "Infinite Jump", CurrentValue = false,
-    Callback = function(state) _G.InfJ = state end})
+    end
+})
+PlayersTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Callback = function(state) _G.InfJ = state end
+})
 
 game:GetService("UserInputService").JumpRequest:Connect(function()
-    if _G.InfJ then pcall(function() localPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping") end) end
+    if _G.InfJ then
+        pcall(function() localPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping") end)
+    end
 end)
+
+-- === SCRIPTS ===
+ScriptsTab:CreateSection("Scripts")
+ScriptsTab:CreateButton({Name = "Anti Fling", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/B2DCzPeD"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Anti Attach", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/VcskV/main/Scripts/Anti-Attach"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Shiftlock For Mobile", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/WQ9NPeDS"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Hitbox Expander", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/HitboxExpander.lua"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Effects Disabler (Anti Lag)", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/EffectsDisabler.lua"))() end)
+end})
+ScriptsTab:CreateButton({Name = "FE Yeet Gui V4", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/FEYeetGuiV4.lua"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Mobile Fly", Callback = function()
+    if game.PlaceId == 2788229376 then
+        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/DaHood/AntiCheatBypass.lua"))() end)
+    end
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/gaz0U0XX"))() end)
+end})
+ScriptsTab:CreateButton({Name = "R15 To R6", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/Scripts/main/R15-To-R6.lua"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Walk On Walls", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/RY9cBbdG"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Keyboard", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/advxzivhsjjdhxhsidifvsh/mobkeyboard/main/main.txt", true))() end)
+end})
+ScriptsTab:CreateButton({Name = "Simple Spy", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/SimpleSpy.lua"))() end)
+end})
+ScriptsTab:CreateButton({Name = "Netless", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/vf1d0baT"))() end)
+end})
+
+-- === FE SCRIPTS ===
+FETab:CreateSection("FE")
+FETab:CreateButton({Name = "FE VR (Execute Netless First)", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/Test-3/main/Test-3"))() end)
+end})
+FETab:CreateButton({Name = "FE Cat", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/FE-Cat/main/FE-Cat"))() end)
+end})
+FETab:CreateButton({Name = "FE SCP-096", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/EM3gWpGZ"))() end)
+end})
+FETab:CreateButton({Name = "FE Baller V2", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Lowerrated/roblox-fe-baller-script/main/main"))() end)
+end})
+FETab:CreateButton({Name = "FE Snake", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastefy.ga/tWBTcE4R/raw", true))() end)
+end})
+FETab:CreateButton({Name = "FE Fake Gorilla Tag V1", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastefy.ga/osEThPw1/raw", true))() end)
+end})
+FETab:CreateButton({Name = "FE Fake Lag", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/VM3b0Thg"))() end)
+end})
+FETab:CreateButton({Name = "FE Free Tools Gamepass", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/h1MBUTui", true))() end)
+end})
 
 -- === BLOX FRUITS TAB ===
 BFTab:CreateSection("Blox Fruits | Auto Farm Completo")
@@ -202,7 +445,6 @@ BFTab:CreateButton({
     Name = "Esconder Pixel Hub",
     Callback = function() setRayfieldVisible(false) end
 })
-
 BFTab:CreateButton({
     Name = "Mostrar Pixel Hub",
     Callback = function() setRayfieldVisible(true) end
@@ -286,6 +528,9 @@ end})
 AdminsTab:CreateButton({Name = "Fates Admin", Callback = function()
     pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/fatesc/fates-admin/main/main.lua"))() end)
 end})
+AdminsTab:CreateButton({Name = "Reviz Admin", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/Caniwq2N", true))() end)
+end})
 
 -- === TOOLS ===
 ToolsTab:CreateSection("Tools")
@@ -295,9 +540,22 @@ end})
 ToolsTab:CreateButton({Name = "Super Tools", Callback = function()
     pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/sQWeMuB0"))() end)
 end})
+ToolsTab:CreateButton({Name = "F3X", Callback = function()
+    pcall(function() loadstring(game:GetObjects("rbxassetid://6695644299")[1].Source)() end)
+end})
+ToolsTab:CreateButton({Name = "Telekinesis", Callback = function()
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/b/main/Test"))() end)
+end})
 
 -- === CREDITS ===
 CreditsTab:CreateSection("Créditos")
-CreditsTab:CreateParagraph({Title = "Pixel Hub", Content = "Rebranded do Astral Hub. UI: Rayfield."})
+CreditsTab:CreateParagraph({
+    Title = "Pixel Hub",
+    Content = "Rebranded do Astral Hub. UI: Rayfield. Migrado em 2026."
+})
 
-Rayfield:Notify({Title = "Pixel Hub", Content = "Bem-vindo, " .. v .. "!", Duration = 5})
+Rayfield:Notify({
+    Title = "Pixel Hub",
+    Content = "Bem-vindo, " .. v .. "!",
+    Duration = 5
+})
