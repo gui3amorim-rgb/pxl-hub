@@ -1,9 +1,8 @@
 --!nocheck
 -- pixel hub loader
 --
--- One line in the executor, every game after that is automatic:
---
---   loadstring(game:HttpGet("https://raw.githubusercontent.com/seltonmt012/sel01-rbx/main/loader.lua"))()
+-- Loadstring:
+--   loadstring(game:HttpGet("https://raw.githubusercontent.com/gui3amorim-rgb/pxl-hub/main/redliner"))()
 
 do
     local getName = identifyexecutor or getexecutorname
@@ -20,6 +19,7 @@ do
     end
 end
 
+local HUB_URL = "https://raw.githubusercontent.com/gui3amorim-rgb/pxl-hub/main/redliner"
 local BASE = "https://raw.githubusercontent.com/seltonmt012/sel01-rbx/main/"
 local CACHE = "sel01/"
 local AUTOLOAD_FILE = "selux-autoload.txt"
@@ -172,14 +172,14 @@ local function arm(entry)
         'pcall(function() getgenv().__SEL_TP = %q end); ' ..
         'pcall(function() writefile(%q, %q) end); ' ..
         'loadstring(game:HttpGet(%q))()',
-        tag, tag, QUEUE_FILE, tag, BASE .. "loader.lua")
+        tag, tag, QUEUE_FILE, tag, HUB_URL)
 
     local gate = (not AUTOLOAD) and gateFor(entry) or nil
     local payload = body
     if gate then
         payload = "task.spawn(function()\n" .. gate
             .. "local hit = false\n"
-            .. "for _ = 20 do if belongs() then hit = true break end task.wait(1) end\n"
+            .. "for _ = 1, 20 do if belongs() then hit = true break end task.wait(1) end\n"
             .. "if not hit then return end\n"
             .. body .. "\nend)"
     end
@@ -200,17 +200,65 @@ if not okIndex or type(INDEX) ~= "table" or type(INDEX.games) ~= "table" then
     return
 end
 
+--------------------------------------------------------------------------------
+-- UI patcher: aplica Pixel Hub, imagem e link do Discord
+--------------------------------------------------------------------------------
+
+local function patchUiTemplate(body)
+    if type(body) ~= "string" then return body end
+
+    -- Título e Branding
+    body = body:gsub('UI%.BRAND%s*=%s*"SELUX"', 'UI.BRAND = "PIXEL HUB"')
+    body = body:gsub('Selux%s+v', 'Pixel Hub v')
+    body = body:gsub('Selux', 'Pixel Hub')
+
+    -- Link do Discord
+    body = body:gsub('UI%.DISCORD%s*=%s*"[^"]+"', 'UI.DISCORD = "discord.gg/uNU9YUsxdR"')
+    body = body:gsub('discord%.gg/ARdpzFuKMm', 'discord.gg/uNU9YUsxdR')
+    body = body:gsub('DISCORD BEITRETEN', 'ENTRAR NO DISCORD')
+
+    -- Ícone / Logo do Asset ID 81893520159352
+    body = body:gsub('UI%.LOGO%s*=%s*"selux%-mark%.png"', 'UI.LOGO = "rbxassetid://81893520159352"')
+    body = body:gsub('function UI%.image%(file%)', 
+        'function UI.image(file)\n\tif type(file) == "string" and (file:find("rbxassetid://") or file:find("^%%d+$")) then return file:find("rbxassetid://") and file or ("rbxassetid://" .. file) end')
+    body = body:gsub('options%.badge or "S"', 'options.badge or ""')
+
+    -- Ajuste de largura do cabeçalho para acomodar "PIXEL HUB" sem sobrepor divisórias
+    body = body:gsub('brand%.Size = UDim2%.fromOffset%(48, 38%)', 'brand.Size = UDim2.fromOffset(84, 38)')
+    body = body:gsub('UDim2%.fromOffset%(66, 13%)', 'UDim2.fromOffset(102, 13)')
+    body = body:gsub('UDim2%.fromOffset%(76, 0%)', 'UDim2.fromOffset(112, 0)')
+
+    -- Disparo automático de convite via Discord RPC local ao clicar no botão
+    body = body:gsub('local function consider%(fn%)', 
+        'pcall(function()\n' ..
+        '    local req = (syn and syn.request) or (http and http.request) or http_request or request\n' ..
+        '    if req then\n' ..
+        '        req({ Url = "http://127.0.0.1:6463/rpc?v=1", Method = "POST", Headers = { ["Content-Type"] = "application/json", ["Origin"] = "https://discord.com" }, Body = game:GetService("HttpService"):JSONEncode({ cmd = "INVITE_BROWSER", args = { code = "uNU9YUsxdR" }, nonce = "1" }) })\n' ..
+        '    end\n' ..
+        'end)\n\tlocal function consider(fn)')
+
+    return body
+end
+
 local UI
 local function ui()
     if UI then return UI end
     local path = INDEX.ui or "lib/ui-template.lua"
     local body = fetch(path)
     if not body then return nil end
+
+    body = patchUiTemplate(body)
     pcall(writefile, "ui-template.lua", body)
+
     local chunk = run(body, path)
     if not chunk then return nil end
     local ok, module = pcall(chunk)
-    if ok and type(module) == "table" then UI = module end
+    if ok and type(module) == "table" then
+        UI = module
+        UI.BRAND = "PIXEL HUB"
+        UI.DISCORD = "discord.gg/uNU9YUsxdR"
+        UI.LOGO = "rbxassetid://81893520159352"
+    end
     return UI
 end
 
@@ -321,7 +369,7 @@ local function keyPanel(entry, reason)
 
     local page = win:Page("KEY", U.icon.shield)
     local card = page:Card(string.upper(tostring(entry.name or entry.alias)), 0):Accent()
-    card:Label("Este script é protegido. Insira sua chave abaixo para desbloquear.")
+    card:Label("Script protegido. Obtenha uma chave pelos links abaixo e pressione RESGATAR.")
 
     local status = page:Card("STATUS", 0):Readout(4)
     local function say(line, extra)
@@ -329,7 +377,7 @@ local function keyPanel(entry, reason)
     end
     say(reason and ("  " .. reason) or "  Nenhuma chave válida.")
 
-    local links = page:Card("PASSO 1 - PEGAR KEY", 1)
+    local links = page:Card("PASSO 1 - PEGAR CHAVE", 1)
     for _, link in ipairs(type(cfg.links) == "table" and cfg.links or {}) do
         if type(link) == "table" and type(link.url) == "string" then
             links:Button(tostring(link.label or "LINK"), function()
@@ -386,7 +434,7 @@ local function loadGame(entry, why)
         end
         local key = readKey()
         if not key then
-            keyPanel(entry, "Kein Key gespeichert.")
+            keyPanel(entry, "Nenhuma chave salva.")
             return false
         end
         local ok, info = redeem(key)
@@ -398,7 +446,7 @@ local function loadGame(entry, why)
             .. "&k=" .. encode(key) .. "&h=" .. encode(hwid()))
         from = "key"
         if not body or #body < 32 then
-            keyPanel(entry, "Key server lieferte nichts.")
+            keyPanel(entry, "Key server não retornou dados.")
             return false
         end
     else
@@ -511,14 +559,14 @@ _G.__SEL = {
         on = on and true or false
         pcall(function() writefile(AUTOLOAD_FILE, on and "1" or "0") end)
         _G.__SEL.autoStart = on
-        notify("Auto-Start in neuen Spielen: " .. (on and "AN" or "AUS"), 4)
+        notify("Auto-Start em novos jogos: " .. (on and "ATIVADO" or "DESATIVADO"), 4)
         AUTOLOAD = on
         if on then arm(_G.__SEL.game) end
         return on
     end,
     reload = function()
-        local src = httpGet(BASE .. "loader.lua?t=" .. tostring(os.time()))
-        if src then local c = run(src, "loader.lua") if c then return c() end end
+        local src = httpGet(HUB_URL .. "?t=" .. tostring(os.time()))
+        if src then local c = run(src, "redliner") if c then return c() end end
         notify("reload failed", 6)
     end,
     picker = picker,
@@ -539,8 +587,7 @@ end
 if not mayStart() then
     local what = entry and (entry.name or entry.alias) or "no script"
     print("[pixelhub] auto-start is off - " .. tostring(what) .. " not started.")
-    print("[pixelhub] run the loader line to start it here, or turn auto-start on:")
-    print("[pixelhub]   _G.__SEL.setAutoStart(true)")
+    print("[pixelhub] execute o loadstring para iniciar aqui.")
 elseif entry then
     loadGame(entry, why)
 else
