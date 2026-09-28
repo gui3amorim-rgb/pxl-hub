@@ -29,9 +29,9 @@ local KEY_CONFIG = {
     -- Configurações da Jnkie (encontradas no seu Dashboard Jnkie):
     Jnkie = {
         UseSDK = true,
-        Service = "script redliner",        -- Nome do seu Serviço na Jnkie
-        Identifier = "1208236",             -- Seu User ID na Jnkie (caso utilize o SDK)
-        Provider = "sla man",
+        Service = "PixelHub",        -- Nome do seu Serviço na Jnkie
+        Identifier = "",             -- Seu User ID na Jnkie (caso utilize o SDK)
+        Provider = "Mixed",
     },
 
     -- Chaves locais de Bypass / VIP (para você ou administradores testarem direto):
