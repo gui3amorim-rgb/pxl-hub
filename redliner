@@ -1,711 +1,449 @@
 --!nocheck
--- pixel hub loader
+-- Pixel Hub Loader com Key System Jnkie (Tema Azul)
 --
 -- Loadstring:
 --   loadstring(game:HttpGet("https://raw.githubusercontent.com/gui3amorim-rgb/pxl-hub/main/redliner"))()
 
-do
-    local getName = identifyexecutor or getexecutorname
-    if getName then
-        local ok, name = pcall(getName)
-        if ok and name then
-            local execName = tostring(name):lower()
-            if execName:find("solara") or execName:find("xeno") then
-                game:GetService("Players").LocalPlayer:Kick(
-                    "EXECUTOR NOT SUPPORTED [PLEASE DON'T GET MAD THIS IS SOLARA/XENO'S FAULT]")
-                return
-            end
-        end
-    end
-end
-
-local HUB_URL  = "https://raw.githubusercontent.com/gui3amorim-rgb/pxl-hub/main/redliner"
-local BASE     = "https://raw.githubusercontent.com/seltonmt012/sel01-rbx/main/"
-local CACHE    = "sel01/"
-local AUTOLOAD_FILE = "selux-autoload.txt"
-
--- ╔══════════════════════════════════════════════════╗
--- ║          PIXEL HUB KEY — jnkie config            ║
--- ╚══════════════════════════════════════════════════╝
-local JNKIE_KEY_URL   = "https://jnkie.com/flow/d8e61c3b-1ab8-4c94-b643-0d6937a803c6"
-local KEY_ACCENT      = Color3.fromRGB(54, 120, 255)   -- azul Pixel Hub
-local KEY_ACCENT_DARK = Color3.fromRGB(30,  80, 200)
-
-local Players    = game:GetService("Players")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
-local StarterGui  = game:GetService("StarterGui")
+local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
 
+local plr = Players.LocalPlayer
 if not game:IsLoaded() then game.Loaded:Wait() end
 
-local PREV = _G.__SEL
-local GEN  = ((PREV and PREV.gen) or 0) + 1
+--------------------------------------------------------------------------------
+-- CONFIGURAÇÕES DO KEY SYSTEM (JNKIE & PIXEL HUB)
+--------------------------------------------------------------------------------
+local KEY_CONFIG = {
+    Title = "PIXEL HUB",
+    Subtitle = "Key System",
+    Icon = "rbxassetid://81893520159352",
+    
+    -- Sua Flow criada na Jnkie:
+    FlowUrl = "https://jnkie.com/flow/d8e61c3b-1ab8-4c94-b643-0d6937a803c6",
+    DiscordUrl = "https://discord.gg/uNU9YUsxdR",
+    SaveFile = "pixelhub-key.txt",
 
-local QUEUE_FILE = "selux-queue.txt"
+    -- Configurações da Jnkie (encontradas no seu Dashboard Jnkie):
+    Jnkie = {
+        UseSDK = true,
+        Service = "script redliner",        -- Nome do seu Serviço na Jnkie
+        Identifier = "1208236",             -- Seu User ID na Jnkie (caso utilize o SDK)
+        Provider = "sla man",
+    },
 
-local function readQueueMarker()
-    local mark = _G.__SEL_TP
-    if type(mark) ~= "string" and getgenv then
-        local ok, shared = pcall(getgenv)
-        if ok and type(shared) == "table" then mark = shared.__SEL_TP end
-    end
-    if type(mark) == "string" then return mark end
-    local ok, body = pcall(function()
-        if not (isfile and readfile and isfile(QUEUE_FILE)) then return nil end
-        return readfile(QUEUE_FILE)
-    end)
-    if ok and type(body) == "string" then return (string.gsub(body, "%s", "")) end
-    return nil
-end
+    -- Chaves locais de Bypass / VIP (para você ou administradores testarem direto):
+    WhitelistKeys = {
+        ["PIXEL-ADM-2026"] = true,
+        ["PIXEL-VIP-ACCESS"] = true,
+    }
+}
 
-local function clearQueueMarker()
-    _G.__SEL_TP = nil
-    if getgenv then pcall(function() getgenv().__SEL_TP = nil end) end
-    pcall(function()
-        if delfile then delfile(QUEUE_FILE) elseif writefile then writefile(QUEUE_FILE, "") end
-    end)
-end
+--------------------------------------------------------------------------------
+-- FUNÇÕES DE UTILIDADE E ARQUIVOS
+--------------------------------------------------------------------------------
+local writefile = writefile or function() end
+local readfile  = readfile
+local isfile    = isfile or function() return false end
+local delfile   = delfile or function() end
 
-local writefile  = writefile  or function() end
-local readfile   = readfile
-local isfile     = isfile     or function() return false end
-local isfolder   = isfolder   or function() return true end
-local makefolder = makefolder or function() end
-local queueTp    = queue_on_teleport or queueonteleport
-    or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
-
-local FROM = readQueueMarker()
-if FROM == "" then FROM = nil end
-local VIA_QUEUE = FROM ~= nil
-clearQueueMarker()
-
-local function notify(text, duration)
-    print("[pixelhub] " .. text)
+local function notify(title, text, duration)
     pcall(function()
         StarterGui:SetCore("SendNotification", {
-            Title = "Pixel Hub", Text = text, Duration = duration or 4,
+            Title = title or "Pixel Hub",
+            Text = text or "",
+            Duration = duration or 4,
         })
     end)
 end
 
-local function httpGet(url)
-    local ok, body = pcall(function() return game:HttpGet(url, false) end)
-    if ok and type(body) == "string" and #body > 0 then return body end
-    local req = (syn and syn.request) or (http and http.request) or http_request or request
-    if req then
-        local ok2, res = pcall(req, { Url = url, Method = "GET" })
-        if ok2 and type(res) == "table" and res.StatusCode == 200 then return res.Body end
-    end
-    return nil
-end
-
-local function fetch(path)
-    if not isfolder(CACHE) then makefolder(CACHE) end
-    local cached = CACHE .. path:gsub("/", "_")
-    local body = httpGet(BASE .. path .. "?t=" .. tostring(os.time()))
-    if body then
-        pcall(writefile, cached, body)
-        return body, "net"
-    end
-    if isfile(cached) and readfile then
-        local ok, disk = pcall(readfile, cached)
-        if ok and disk and #disk > 0 then return disk, "cache" end
-    end
-    return nil
-end
-
-local function run(source, chunkName)
-    local chunk, err = loadstring(source, "@" .. chunkName)
-    if not chunk then return nil, err end
-    return chunk
-end
-
-local function readFlag(path)
-    local ok, body = pcall(function()
-        if not (isfile and readfile and isfile(path)) then return nil end
-        local text = readfile(path)
-        if type(text) ~= "string" then return nil end
-        return (string.gsub(text, "%s", ""))
+local function openUrl(url)
+    local env = (getgenv and getgenv()) or _G or {}
+    pcall(function()
+        local setCb = setclipboard or toclipboard or set_clipboard or env.setclipboard
+        if setCb then setCb(url) end
     end)
-    if not ok then return nil end
-    return body
-end
 
-local AUTOLOAD = false
-do
-    local saved = readFlag(AUTOLOAD_FILE)
-    if type(saved) == "string" then
-        saved = string.lower(saved)
-        AUTOLOAD = saved == "1" or saved == "on" or saved == "true"
+    local openers = {
+        rawget(env, "openbrowser"),
+        rawget(env, "open_url"),
+        rawget(env, "openurl"),
+        rawget(env, "browse"),
+        syn and syn.open_url,
+        fluxus and fluxus.open_url,
+    }
+
+    for _, fn in ipairs(openers) do
+        if type(fn) == "function" and pcall(fn, url) then return "browser" end
     end
+
+    pcall(function()
+        local gui = game:GetService("GuiService")
+        if gui and type(gui.OpenBrowserWindow) == "function" then
+            gui:OpenBrowserWindow(url)
+            return "browser"
+        end
+    end)
+
+    return "clipboard"
 end
 
-local armed = false
-
-local function gateFor(entry)
-    if type(entry) ~= "table" then return nil end
-    local ids = {}
-    if type(entry.places) == "table" then
-        for _, id in ipairs(entry.places) do
-            local n = tonumber(id)
-            if n then ids[#ids + 1] = string.format("%d", n) end
+local function readSavedKey()
+    if isfile and readfile and isfile(KEY_CONFIG.SaveFile) then
+        local ok, content = pcall(readfile, KEY_CONFIG.SaveFile)
+        if ok and type(content) == "string" then
+            return (string.gsub(content, "%s+", ""))
         end
     end
-    local detect = type(entry.detect) == "string" and entry.detect or ""
-    if #ids == 0 and detect == "" then return nil end
-    return "local P = {" .. table.concat(ids, ",") .. "}\n"
-        .. "local function belongs()\n"
-        .. "for _, id in ipairs(P) do if id == game.PlaceId then return true end end\n"
-        .. "local ok, r = pcall(function()\n" .. detect .. "\nend)\n"
-        .. "return ok and r == true\n"
-        .. "end\n"
-end
-
-local function arm(entry)
-    if armed or not queueTp then return end
-    armed = true
-    local tag = "*"
-    if type(entry) == "table" and type(entry.alias) == "string" and entry.alias ~= "" then
-        tag = entry.alias
-    elseif type(entry) == "string" and entry ~= "" then
-        tag = entry
-    end
-    local body = string.format(
-        '_G.__SEL_TP = %q; ' ..
-        'pcall(function() getgenv().__SEL_TP = %q end); ' ..
-        'pcall(function() writefile(%q, %q) end); ' ..
-        'loadstring(game:HttpGet(%q))()',
-        tag, tag, QUEUE_FILE, tag, HUB_URL)
-    local gate    = (not AUTOLOAD) and gateFor(entry) or nil
-    local payload = body
-    if gate then
-        payload = "task.spawn(function()\n" .. gate
-            .. "local hit = false\n"
-            .. "for _ = 1, 20 do if belongs() then hit = true break end task.wait(1) end\n"
-            .. "if not hit then return end\n"
-            .. body .. "\nend)"
-    end
-    pcall(queueTp, payload)
-end
-
-if AUTOLOAD then arm() end
-
-local indexBody, indexFrom = fetch("index.json")
-if not indexBody then
-    notify("index.json unreachable and no cache - nothing loaded", 8)
-    return
-end
-
-local okIndex, INDEX = pcall(function() return HttpService:JSONDecode(indexBody) end)
-if not okIndex or type(INDEX) ~= "table" or type(INDEX.games) ~= "table" then
-    notify("index.json is not valid JSON", 8)
-    return
-end
-
--- ─────────────────────────────────────────────────────────────────────────────
--- UI patcher: branding + BLUE accent para Pixel Hub
--- ─────────────────────────────────────────────────────────────────────────────
-local function patchUiTemplate(body)
-    if type(body) ~= "string" then return body end
-
-    -- Título e Branding
-    body = body:gsub('UI%.BRAND%s*=%s*"SELUX"',    'UI.BRAND = "PIXEL HUB"')
-    body = body:gsub('Selux%s+v',                   'Pixel Hub v')
-    body = body:gsub('Selux',                       'Pixel Hub')
-
-    -- Discord
-    body = body:gsub('UI%.DISCORD%s*=%s*"[^"]+"',  'UI.DISCORD = "discord.gg/uNU9YUsxdR"')
-    body = body:gsub('discord%.gg/ARdpzFuKMm',     'discord.gg/uNU9YUsxdR')
-    body = body:gsub('DISCORD BEITRETEN',           'ENTRAR NO DISCORD')
-
-    -- Logo
-    body = body:gsub('UI%.LOGO%s*=%s*"selux%-mark%.png"',
-        'UI.LOGO = "rbxassetid://81893520159352"')
-    body = body:gsub('function UI%.image%(file%)',
-        'function UI.image(file)\n\tif type(file) == "string" and (file:find("rbxassetid://") or file:find("^%%d+$")) then return file:find("rbxassetid://") and file or ("rbxassetid://" .. file) end')
-    body = body:gsub('options%.badge or "S"',       'options.badge or ""')
-
-    -- Largura do header para "PIXEL HUB"
-    body = body:gsub('brand%.Size = UDim2%.fromOffset%(48, 38%)',  'brand.Size = UDim2.fromOffset(84, 38)')
-    body = body:gsub('UDim2%.fromOffset%(66, 13%)',                'UDim2.fromOffset(102, 13)')
-    body = body:gsub('UDim2%.fromOffset%(76, 0%)',                 'UDim2.fromOffset(112, 0)')
-
-    -- ── BLUE ACCENT ──────────────────────────────────────────────────────────
-    -- Substitui tons de roxo/laranja padrão do Selux pelo azul Pixel Hub
-    local blue   = "Color3.fromRGB(54, 120, 255)"
-    local blueDk = "Color3.fromRGB(30,  80, 200)"
-
-    body = body:gsub('Color3%.fromRGB%(180,%s*130,%s*255%)', blue)   -- selux purple
-    body = body:gsub('Color3%.fromRGB%(150,%s*100,%s*240%)', blue)
-    body = body:gsub('Color3%.fromRGB%(255,%s*165,%s*0%)',   blue)   -- qualquer laranja
-    body = body:gsub('Color3%.fromRGB%(255,%s*200,%s*0%)',   blue)
-    body = body:gsub('Color3%.fromRGB%(220,%s*160,%s*255%)', blue)
-    body = body:gsub('Color3%.fromRGB%(130,%s*80,%s*220%)',  blueDk)
-    -- accent genérico caso o template exponha uma variável
-    body = body:gsub('ACCENT_COLOR%s*=%s*Color3[^\n]+', 'ACCENT_COLOR = ' .. blue)
-    body = body:gsub("theme%.accent%s*=%s*Color3[^\n]+", "theme.accent = " .. blue)
-    -- ─────────────────────────────────────────────────────────────────────────
-
-    -- Discord RPC invite ao clicar no botão
-    body = body:gsub('local function consider%(fn%)',
-        'pcall(function()\n' ..
-        '    local req = (syn and syn.request) or (http and http.request) or http_request or request\n' ..
-        '    if req then\n' ..
-        '        req({ Url = "http://127.0.0.1:6463/rpc?v=1", Method = "POST",\n' ..
-        '              Headers = { ["Content-Type"] = "application/json", ["Origin"] = "https://discord.com" },\n' ..
-        '              Body = game:GetService("HttpService"):JSONEncode({ cmd = "INVITE_BROWSER", args = { code = "uNU9YUsxdR" }, nonce = "1" }) })\n' ..
-        '    end\n' ..
-        'end)\n\tlocal function consider(fn)')
-
-    return body
-end
-
-local UI
-local function ui()
-    if UI then return UI end
-    local path = INDEX.ui or "lib/ui-template.lua"
-    local body = fetch(path)
-    if not body then return nil end
-
-    body = patchUiTemplate(body)
-    pcall(writefile, "ui-template.lua", body)
-
-    local chunk = run(body, path)
-    if not chunk then return nil end
-    local ok, module = pcall(chunk)
-    if ok and type(module) == "table" then
-        UI = module
-        UI.BRAND   = "PIXEL HUB"
-        UI.DISCORD = "discord.gg/uNU9YUsxdR"
-        UI.LOGO    = "rbxassetid://81893520159352"
-    end
-    return UI
-end
-
-local function matchesPlace(entry)
-    if type(entry.places) ~= "table" then return false end
-    for _, id in ipairs(entry.places) do
-        if tonumber(id) == game.PlaceId then return true end
-    end
-    return false
-end
-
-local function matchesDetect(entry)
-    if type(entry.detect) ~= "string" or entry.detect == "" then return false end
-    local chunk = run("return function() " .. entry.detect .. " end",
-        "detect:" .. tostring(entry.alias))
-    if not chunk then return false end
-    local okOuter, fn = pcall(chunk)
-    if not okOuter or type(fn) ~= "function" then return false end
-    local ok, result = pcall(fn)
-    return ok and result == true
-end
-
-local function pick()
-    for _, entry in ipairs(INDEX.games) do
-        if matchesPlace(entry) then return entry, "place" end
-    end
-    for _, entry in ipairs(INDEX.games) do
-        if matchesDetect(entry) then return entry, "detect" end
-    end
     return nil
 end
 
-local function byAlias(alias)
-    alias = tostring(alias):lower()
-    for _, entry in ipairs(INDEX.games) do
-        if tostring(entry.alias):lower() == alias then return entry end
+local function saveKey(k)
+    pcall(writefile, KEY_CONFIG.SaveFile, tostring(k))
+end
+
+--------------------------------------------------------------------------------
+-- VALIDAÇÃO DA CHAVE (JNKIE SDK / API)
+--------------------------------------------------------------------------------
+local function validateKey(typedKey)
+    if not typedKey or typedKey == "" then
+        return false, "Insira sua chave obtida na Jnkie."
     end
-    for _, entry in ipairs(INDEX.games) do
-        if tostring(entry.name):lower():find(alias, 1, true) then return entry end
+
+    -- 1. Verifica chaves locais de Bypass
+    if KEY_CONFIG.WhitelistKeys[typedKey] then
+        return true, "Chave VIP aceita!"
     end
-    return nil
-end
 
-local KEY_FILE = "selux-key.txt"
+    -- 2. Verificação via SDK Oficial da Jnkie
+    if KEY_CONFIG.Jnkie.UseSDK and KEY_CONFIG.Jnkie.Identifier ~= "" then
+        local sdkOk, Junkie = pcall(function()
+            return loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
+        end)
 
-local function keyConfig()
-    local cfg = INDEX.key
-    if type(cfg) ~= "table" then return nil end
-    if type(cfg.api) ~= "string" or cfg.api == "" then return nil end
-    return cfg
-end
+        if sdkOk and type(Junkie) == "table" and type(Junkie.check_key) == "function" then
+            Junkie.service = KEY_CONFIG.Jnkie.Service
+            Junkie.identifier = KEY_CONFIG.Jnkie.Identifier
+            Junkie.provider = KEY_CONFIG.Jnkie.Provider
 
-local function hwid()
-    local ok, id = pcall(function()
-        return game:GetService("RbxAnalyticsService"):GetClientId()
-    end)
-    if ok and type(id) == "string" and #id > 4 then return id end
-    local ok2, id2 = pcall(function() return gethwid and gethwid() end)
-    if ok2 and type(id2) == "string" and #id2 > 4 then return id2 end
-    return "fallback-" .. tostring(game.PlaceId)
-end
-
-local function readKey()
-    local raw = readFlag(KEY_FILE)
-    if type(raw) ~= "string" or raw == "" then return nil end
-    local key, exp = string.match(raw, "^([^;]+);?(%d*)$")
-    if not key or key == "" then return nil end
-    return key, tonumber(exp) or 0
-end
-
-local function saveKey(key, expires)
-    pcall(writefile, KEY_FILE, tostring(key) .. ";" .. tostring(expires or 0))
-end
-
-local function encode(text)
-    local ok, out = pcall(function() return HttpService:UrlEncode(tostring(text)) end)
-    if ok then return out end
-    return tostring(text)
-end
-
-local function redeem(key)
-    local cfg = keyConfig()
-    if not cfg then return false, "no key config in the registry" end
-    local body = httpGet(cfg.api .. "/redeem?k=" .. encode(key) .. "&h=" .. encode(hwid()))
-    if not body then return false, "key server unreachable" end
-    local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
-    if not ok or type(data) ~= "table" then return false, "bad reply from key server" end
-    if data.ok then return true, tonumber(data.expires) or 0 end
-    return false, tostring(data.error or "invalid key")
-end
-
-local keyWindow
-
--- ╔══════════════════════════════════════════════════════════════════════════╗
--- ║                    PIXEL HUB KEY  —  painel de chave                   ║
--- ║   azul, jnkie hardcoded, funciona com ou sem cfg.api no index.json     ║
--- ╚══════════════════════════════════════════════════════════════════════════╝
-local function keyPanel(entry, reason)
-    local cfg = keyConfig()  -- pode ser nil; painel funciona sem ele
-    local U   = ui()
-
-    if not U then
-        -- fallback sem UI: imprime no console
-        notify("chave necessária — acesse: " .. JNKIE_KEY_URL, 14)
-        print("[pixelhub] KEY REQUIRED")
-        print("[pixelhub] Pegue sua chave em: " .. JNKIE_KEY_URL)
-        print("[pixelhub] Depois use: _G.__SEL.key.save(\"SUA-CHAVE\")")
-        _G.__SEL = _G.__SEL or {}
-        _G.__SEL.key = _G.__SEL.key or {}
-        _G.__SEL.key.save = function(k)
-            saveKey(k, 0)
-            print("[pixelhub] chave salva — reexecute o loadstring.")
+            local resOk, result = pcall(Junkie.check_key, typedKey)
+            if resOk and type(result) == "table" then
+                if result.valid then
+                    return true, "Chave válida via Jnkie!"
+                else
+                    return false, tostring(result.error or "Chave inválida ou expirada.")
+                end
+            end
         end
+    end
+
+    -- 3. Verificação de formato (qualquer chave com mais de 8 caracteres é aceita se o SDK não estiver configurado com Identifier)
+    if #typedKey >= 8 then
+        return true, "Chave verificada com sucesso!"
+    end
+
+    return false, "Chave muito curta ou inválida."
+end
+
+--------------------------------------------------------------------------------
+-- INTERFACE DO KEY SYSTEM (TEMA AZUL / NEON)
+--------------------------------------------------------------------------------
+local function buildKeySystemUI(onSuccess)
+    local parentGui
+    pcall(function() parentGui = (gethui and gethui()) or CoreGui end)
+    if not parentGui then parentGui = plr:WaitForChild("PlayerGui") end
+
+    local existing = parentGui:FindFirstChild("PixelHubKeyUI")
+    if existing then existing:Destroy() end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "PixelHubKeyUI"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = parentGui
+
+    -- Card Principal
+    local main = Instance.new("Frame")
+    main.Name = "Main"
+    main.Size = UDim2.fromOffset(460, 305)
+    main.Position = UDim2.fromScale(0.5, 0.5)
+    main.AnchorPoint = Vector2.new(0.5, 0.5)
+    main.BackgroundColor3 = Color3.fromRGB(11, 15, 26)
+    main.BorderSizePixel = 0
+    main.ClipsDescendants = true
+    main.Parent = gui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = main
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(37, 99, 235)
+    stroke.Thickness = 1.5
+    stroke.Parent = main
+
+    -- Faixa Neon Superior
+    local topGlow = Instance.new("Frame")
+    topGlow.Size = UDim2.new(1, 0, 0, 3)
+    topGlow.BackgroundColor3 = Color3.fromRGB(59, 130, 246)
+    topGlow.BorderSizePixel = 0
+    topGlow.Parent = main
+
+    -- Cabeçalho
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 52)
+    header.BackgroundTransparency = 1
+    header.Parent = main
+
+    local logo = Instance.new("ImageLabel")
+    logo.Size = UDim2.fromOffset(32, 32)
+    logo.Position = UDim2.fromOffset(16, 10)
+    logo.BackgroundTransparency = 1
+    logo.Image = KEY_CONFIG.Icon
+    logo.ScaleType = Enum.ScaleType.Fit
+    logo.Parent = header
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.fromOffset(200, 22)
+    title.Position = UDim2.fromOffset(56, 8)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.Text = KEY_CONFIG.Title
+    title.TextColor3 = Color3.fromRGB(241, 245, 249)
+    title.TextSize = 16
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = header
+
+    local subTitle = Instance.new("TextLabel")
+    subTitle.Size = UDim2.fromOffset(200, 16)
+    subTitle.Position = UDim2.fromOffset(56, 28)
+    subTitle.BackgroundTransparency = 1
+    subTitle.Font = Enum.Font.Gotham
+    subTitle.Text = KEY_CONFIG.Subtitle .. " • Jnkie"
+    subTitle.TextColor3 = Color3.fromRGB(96, 165, 250)
+    subTitle.TextSize = 11
+    subTitle.TextXAlignment = Enum.TextXAlignment.Left
+    subTitle.Parent = header
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.fromOffset(28, 28)
+    closeBtn.Position = UDim2.new(1, -40, 0, 12)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(17, 24, 39)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
+    closeBtn.TextSize = 13
+    closeBtn.AutoButtonColor = false
+    closeBtn.Parent = header
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeBtn
+
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+
+    local line = Instance.new("Frame")
+    line.Size = UDim2.new(1, -32, 0, 1)
+    line.Position = UDim2.fromOffset(16, 54)
+    line.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+    line.BorderSizePixel = 0
+    line.Parent = main
+
+    -- Campo de Entrada
+    local inputContainer = Instance.new("Frame")
+    inputContainer.Size = UDim2.new(1, -32, 0, 44)
+    inputContainer.Position = UDim2.fromOffset(16, 72)
+    inputContainer.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+    inputContainer.BorderSizePixel = 0
+    inputContainer.Parent = main
+
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 8)
+    inputCorner.Parent = inputContainer
+
+    local inputStroke = Instance.new("UIStroke")
+    inputStroke.Color = Color3.fromRGB(30, 58, 138)
+    inputStroke.Thickness = 1
+    inputStroke.Parent = inputContainer
+
+    local keyInput = Instance.new("TextBox")
+    keyInput.Size = UDim2.new(1, -20, 1, 0)
+    keyInput.Position = UDim2.fromOffset(10, 0)
+    keyInput.BackgroundTransparency = 1
+    keyInput.Font = Enum.Font.Gotham
+    keyInput.PlaceholderText = "Cole sua chave da Jnkie aqui..."
+    keyInput.PlaceholderColor3 = Color3.fromRGB(100, 116, 139)
+    keyInput.Text = ""
+    keyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    keyInput.TextSize = 13
+    keyInput.ClearTextOnFocus = false
+    keyInput.Parent = inputContainer
+
+    -- Status
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, -32, 0, 20)
+    status.Position = UDim2.fromOffset(16, 124)
+    status.BackgroundTransparency = 1
+    status.Font = Enum.Font.Gotham
+    status.Text = "Status: Aguardando verificação..."
+    status.TextColor3 = Color3.fromRGB(148, 163, 184)
+    status.TextSize = 12
+    status.TextXAlignment = Enum.TextXAlignment.Left
+    status.Parent = main
+
+    -- Container de Botões
+    local btnContainer = Instance.new("Frame")
+    btnContainer.Size = UDim2.new(1, -32, 0, 42)
+    btnContainer.Position = UDim2.fromOffset(16, 154)
+    btnContainer.BackgroundTransparency = 1
+    btnContainer.Parent = main
+
+    -- Botão Verificar
+    local verifyBtn = Instance.new("TextButton")
+    verifyBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    verifyBtn.Position = UDim2.new(0, 0, 0, 0)
+    verifyBtn.BackgroundColor3 = Color3.fromRGB(37, 99, 235)
+    verifyBtn.Font = Enum.Font.GothamBold
+    verifyBtn.Text = "VERIFICAR KEY"
+    verifyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    verifyBtn.TextSize = 13
+    verifyBtn.AutoButtonColor = false
+    verifyBtn.Parent = btnContainer
+
+    local vCorner = Instance.new("UICorner")
+    vCorner.CornerRadius = UDim.new(0, 8)
+    vCorner.Parent = verifyBtn
+
+    -- Botão Pegar Key (Link direto da sua Flow Jnkie)
+    local getKeyBtn = Instance.new("TextButton")
+    getKeyBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    getKeyBtn.Position = UDim2.new(0.5, 6, 0, 0)
+    getKeyBtn.BackgroundColor3 = Color3.fromRGB(29, 78, 216)
+    getKeyBtn.Font = Enum.Font.GothamBold
+    getKeyBtn.Text = "PEGAR KEY (JNKIE)"
+    getKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    getKeyBtn.TextSize = 13
+    getKeyBtn.AutoButtonColor = false
+    getKeyBtn.Parent = btnContainer
+
+    local gCorner = Instance.new("UICorner")
+    gCorner.CornerRadius = UDim.new(0, 8)
+    gCorner.Parent = getKeyBtn
+
+    -- Botão Discord / Suporte
+    local discordFooter = Instance.new("TextButton")
+    discordFooter.Size = UDim2.new(1, -32, 0, 36)
+    discordFooter.Position = UDim2.fromOffset(16, 246)
+    discordFooter.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+    discordFooter.Font = Enum.Font.Gotham
+    discordFooter.Text = "Entrar no Discord (Suporte e Avisos)"
+    discordFooter.TextColor3 = Color3.fromRGB(96, 165, 250)
+    discordFooter.TextSize = 11
+    discordFooter.AutoButtonColor = false
+    discordFooter.Parent = main
+
+    local dCorner = Instance.new("UICorner")
+    dCorner.CornerRadius = UDim.new(0, 6)
+    dCorner.Parent = discordFooter
+
+    local dStroke = Instance.new("UIStroke")
+    dStroke.Color = Color3.fromRGB(30, 41, 59)
+    dStroke.Thickness = 1
+    dStroke.Parent = discordFooter
+
+    -- Handlers
+    local function setStatus(msg, isSuccess)
+        status.Text = "Status: " .. msg
+        status.TextColor3 = isSuccess and Color3.fromRGB(52, 211, 153) or Color3.fromRGB(248, 113, 113)
+    end
+
+    getKeyBtn.MouseButton1Click:Connect(function()
+        local res = openUrl(KEY_CONFIG.FlowUrl)
+        if res == "browser" then
+            setStatus("Jnkie aberta no navegador!", true)
+        else
+            setStatus("Link da Jnkie copiado para a área de transferência!", true)
+        end
+    end)
+
+    discordFooter.MouseButton1Click:Connect(function()
+        openUrl(KEY_CONFIG.DiscordUrl)
+        setStatus("Link do Discord copiado!", true)
+    end)
+
+    verifyBtn.MouseButton1Click:Connect(function()
+        local typed = (string.gsub(keyInput.Text, "%s+", ""))
+        setStatus("Verificando chave...", true)
+        task.wait(0.3)
+        local ok, msg = validateKey(typed)
+        if ok then
+            setStatus("Chave confirmada! Iniciando o Pixel Hub...", true)
+            saveKey(typed)
+            task.delay(0.6, function()
+                gui:Destroy()
+                if onSuccess then onSuccess() end
+            end)
+        else
+            setStatus(msg, false)
+        end
+    end)
+
+    -- Animação de Entrada
+    main.Position = UDim2.fromScale(0.5, 0.46)
+    main.BackgroundTransparency = 1
+    stroke.Transparency = 1
+    topGlow.BackgroundTransparency = 1
+    TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = UDim2.fromScale(0.5, 0.5),
+        BackgroundTransparency = 0
+    }):Play()
+    TweenService:Create(topGlow, TweenInfo.new(0.3), { BackgroundTransparency = 0 }):Play()
+    TweenService:Create(stroke, TweenInfo.new(0.3), { Transparency = 0 }):Play()
+end
+
+--------------------------------------------------------------------------------
+-- CARREGAMENTO DO PIXEL HUB
+--------------------------------------------------------------------------------
+local function startHub()
+    notify("Pixel Hub", "Carregando scripts...", 4)
+
+    local HUB_URL = "https://raw.githubusercontent.com/seltonmt012/sel01-rbx/main/loader.lua"
+    local ok, source = pcall(function() return game:HttpGet(HUB_URL, false) end)
+    if not ok or not source or #source < 50 then
+        notify("Pixel Hub", "Falha ao baixar o loader.", 6)
         return
     end
 
-    if keyWindow then pcall(function() keyWindow:Destroy() end) end
+    -- Patcher de estilo para manter tema azul e títulos Pixel Hub
+    source = source:gsub('UI%.BRAND%s*=%s*"SELUX"', 'UI.BRAND = "PIXEL HUB"')
+    source = source:gsub('UI%.DISCORD%s*=%s*"[^"]+"', 'UI.DISCORD = "discord.gg/uNU9YUsxdR"')
+    source = source:gsub('UI%.LOGO%s*=%s*"selux%-mark%.png"', 'UI.LOGO = "' .. KEY_CONFIG.Icon .. '"')
+    source = source:gsub('options%.badge or "S"', 'options.badge or ""')
 
-    -- ── janela principal ────────────────────────────────────────────────────
-    local win = U.Window({
-        name        = "PixelHubKeyPanel",
-        title       = "PIXEL HUB",
-        accentTitle = "KEY",
-        subtitle    = "verificação de chave",
-        badge       = "rbxassetid://81893520159352",
-        width       = 820,
-        height      = 600,
-        accent      = KEY_ACCENT,        -- azul
-    })
-    keyWindow = win
-
-    local page = win:Page("KEY", U.icon and U.icon.shield or nil)
-
-    -- card de cabeçalho
-    local header = page:Card("PIXEL HUB KEY", 0):Accent()
-    header:Label("Script protegido por chave.")
-    header:Label("Clique em PEGAR CHAVE, complete o processo no site e cole a chave abaixo.")
-
-    -- readout de status
-    local statusCard = page:Card("STATUS", 0):Readout(4)
-    local function say(a, b, c, d)
-        pcall(function() statusCard:set({ a or "", b or "", c or "", d or "" }) end)
-    end
-    say("  " .. (reason or "Nenhuma chave válida encontrada."))
-
-    -- ── PASSO 1: link jnkie (sempre visível) ────────────────────────────────
-    local linkCard = page:Card("PASSO 1 — PEGAR CHAVE", 1)
-    linkCard:Label("Acesse o link, complete os passos e copie a chave gerada.")
-
-    linkCard:Button("🔑  PEGAR CHAVE  (jnkie.com)", function()
-        local how = "aberto"
-        if U.openUrl then
-            local ok2, r = pcall(U.openUrl, JNKIE_KEY_URL)
-            if ok2 and r then how = tostring(r) end
-        else
-            -- fallback: tenta via clipboard/setclipboard
-            pcall(function()
-                if setclipboard then
-                    setclipboard(JNKIE_KEY_URL)
-                    how = "link copiado para a área de transferência"
-                end
-            end)
-        end
-        say("  Link aberto — " .. how, "  Complete os passos no site.", "", "")
-    end, KEY_ACCENT)
-
-    -- links extras do index.json, se existirem
-    if cfg and type(cfg.links) == "table" then
-        for _, link in ipairs(cfg.links) do
-            if type(link) == "table" and type(link.url) == "string"
-                and link.url ~= JNKIE_KEY_URL then
-                linkCard:Button(tostring(link.label or "LINK EXTRA"), function()
-                    local ok2, r = pcall(U.openUrl, link.url)
-                    say("  " .. tostring(link.label) .. (ok2 and (" — " .. tostring(r)) or ""), "", "", "")
-                end)
-            end
-        end
+    local fn, err = loadstring(source, "@pixelhub_core")
+    if not fn then
+        notify("Pixel Hub", "Erro no script: " .. tostring(err), 8)
+        return
     end
 
-    -- ── PASSO 2: inserir e resgatar chave ───────────────────────────────────
-    local redeemCard = page:Card("PASSO 2 — RESGATAR CHAVE", 2)
-    local box = redeemCard:Input("Cole aqui sua chave...")
-
-    redeemCard:Button("✔  RESGATAR", function()
-        local typed = box.get and box.get() or ""
-        typed = string.gsub(tostring(typed), "%s", "")
-
-        if typed == "" then
-            say("  ⚠  Nenhuma chave digitada.", "", "", "")
-            return
-        end
-
-        say("  Verificando chave...", "", "", "")
-
-        if cfg then
-            -- validação no servidor do index.json
-            local ok2, info = redeem(typed)
-            if not ok2 then
-                say("  ✖  Recusada: " .. tostring(info), "  Tente uma chave nova.", "", "")
-                return
-            end
-            saveKey(typed, info)
-            say("  ✔  Chave aceita!", "  Carregando script...", "", "")
-        else
-            -- sem servidor — aceita qualquer chave não-vazia e salva localmente
-            saveKey(typed, 0)
-            say("  ✔  Chave salva localmente.", "  Carregando script...", "", "")
-        end
-
-        task.delay(0.5, function()
-            pcall(function() win:Destroy() end)
-            keyWindow = nil
-            if _G.__SEL and _G.__SEL.loadGame then
-                _G.__SEL.loadGame(entry, "key")
-            end
-        end)
-    end, KEY_ACCENT)
-
-    redeemCard:Button("🗑  Esquecer chave salva", function()
-        pcall(function()
-            if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end
-        end)
-        pcall(writefile, KEY_FILE, "")
-        say("  Chave removida.", "  Pegue uma nova chave no link acima.", "", "")
-    end, U.theme and U.theme.bad or Color3.fromRGB(200, 55, 55))
-
-    pcall(function() win:Home() end)
-    win:Refresh()
+    pcall(fn)
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
-
-local function loadGame(entry, why)
-    if type(entry) == "string" then
-        local found = byAlias(entry)
-        if not found then
-            notify("no game called '" .. entry .. "' in the registry", 6)
-            return false
-        end
-        entry = found
-    end
-    if not entry then return false end
-
-    local body, from
-    if entry.paid or entry.key then
-        local cfg = keyConfig()
-
-        -- verifica chave salva
-        local savedKey = readKey()
-        if not savedKey then
-            keyPanel(entry, "Nenhuma chave salva.")
-            return false
-        end
-
-        if cfg then
-            -- validação no servidor
-            local ok2, info = redeem(savedKey)
-            if not ok2 then
-                keyPanel(entry, tostring(info))
-                return false
-            end
-            body = httpGet(cfg.api .. "/s?a=" .. encode(entry.alias)
-                .. "&k=" .. encode(savedKey) .. "&h=" .. encode(hwid()))
-            from = "key"
-            if not body or #body < 32 then
-                keyPanel(entry, "Key server não retornou dados.")
-                return false
-            end
-        else
-            -- sem servidor: carrega o arquivo normalmente após chave local
-            body, from = fetch(entry.file)
-            from = from and ("key+" .. from) or "key-local"
-        end
-    else
-        body, from = fetch(entry.file)
-    end
-
-    if not body then
-        notify("could not fetch " .. tostring(entry.file), 8)
-        return false
-    end
-
-    ui()
-    _G.__SEL.game   = entry
-    _G.__SEL.source = from
-
-    if not entry.noqueue then arm(entry) end
-
-    local chunk, err = run(body, entry.file)
-    if not chunk then
-        notify("syntax error in " .. entry.file .. ": " .. tostring(err), 10)
-        warn("[pixelhub] " .. tostring(err))
-        return false
-    end
-
-    notify((entry.name or entry.alias) .. "  (" .. (why or "manual") .. ", " .. from .. ")")
-    local ok, runErr = pcall(chunk)
-    if not ok then
-        notify("crashed: " .. tostring(runErr), 10)
-        warn("[pixelhub] " .. tostring(runErr))
-        return false
-    end
-    return true
-end
-
-local function textPicker()
-    notify("no script for place " .. game.PlaceId .. " - pick one manually", 10)
-    print("[pixelhub] _G.__SEL.load(\"alias\"):")
-    for _, entry in ipairs(INDEX.games) do
-        print(string.format("  %-14s %s", entry.alias or "?", entry.name or ""))
+--------------------------------------------------------------------------------
+-- VERIFICAÇÃO AUTOMÁTICA DE CHAVE SALVA
+--------------------------------------------------------------------------------
+local saved = readSavedKey()
+if saved then
+    local valid = validateKey(saved)
+    if valid then
+        startHub()
+        return
     end
 end
 
-local function buildPicker()
-    local U = ui()
-    if not U or type(U.Window) ~= "function" then return false end
-    if _G.__SEL.pickerWindow then pcall(function() _G.__SEL.pickerWindow:Destroy() end) end
-
-    local win = U.Window({
-        title       = "PIXEL",
-        accentTitle = "HUB",
-        subtitle    = "hub",
-        badge       = "rbxassetid://81893520159352",
-        width       = 760,
-        height      = 520,
-        accent      = KEY_ACCENT,
-    })
-    local page = win:Page("HUB", U.icon and U.icon.list or nil)
-    local info = page:Card("PLACE", 1)
-    info:Label("place " .. tostring(game.PlaceId))
-    info:Label("no script registered for this game")
-    info:Button("Re-check", function()
-        local e2, w2 = pick()
-        if e2 then win:Destroy() loadGame(e2, w2) end
-    end)
-
-    local list = page:Card("SCRIPTS", 2)
-    for _, entry in ipairs(INDEX.games) do
-        local tone = entry.status == "wip" and U.theme.warn or nil
-        list:Button(entry.name or entry.alias, function()
-            win:Destroy()
-            _G.__SEL.pickerWindow = nil
-            loadGame(entry, "forced")
-        end, tone)
-    end
-    win:SetStatus("place " .. tostring(game.PlaceId) .. "   " .. #INDEX.games .. " scripts")
-    win:Refresh()
-    _G.__SEL.pickerWindow = win
-    return true
-end
-
-local function picker()
-    local ok, built = pcall(buildPicker)
-    if not ok or not built then textPicker() end
-    if not ok then warn("[pixelhub] picker: " .. tostring(built)) end
-end
-
-_G.__SEL = {
-    gen        = GEN,
-    base       = BASE,
-    index      = INDEX,
-    hubVersion = INDEX.version,
-    indexFrom  = indexFrom,
-    ui         = nil,
-    game       = nil,
-    fetch      = fetch,
-    load       = function(alias) return loadGame(alias, "manual") end,
-    loadGame   = loadGame,
-    key = {
-        read   = readKey,
-        redeem = redeem,
-        hwid   = hwid,
-        panel  = keyPanel,
-        save   = function(k) saveKey(k, 0) end,
-        forget = function()
-            pcall(function()
-                if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end
-            end)
-            pcall(writefile, KEY_FILE, "")
-        end,
-    },
-    list = function()
-        local out = {}
-        for _, entry in ipairs(INDEX.games) do
-            out[#out + 1] = string.format("%-14s %s", entry.alias or "?", entry.name or "")
-        end
-        return table.concat(out, "\n")
-    end,
-    autoStart = AUTOLOAD,
-    viaQueue  = VIA_QUEUE,
-    from      = FROM,
-    setAutoStart = function(on)
-        on = on and true or false
-        pcall(function() writefile(AUTOLOAD_FILE, on and "1" or "0") end)
-        _G.__SEL.autoStart = on
-        notify("Auto-Start: " .. (on and "ATIVADO" or "DESATIVADO"), 4)
-        AUTOLOAD = on
-        if on then arm(_G.__SEL.game) end
-        return on
-    end,
-    reload = function()
-        local src = httpGet(HUB_URL .. "?t=" .. tostring(os.time()))
-        if src then local c = run(src, "redliner") if c then return c() end end
-        notify("reload failed", 6)
-    end,
-    picker = picker,
-}
-setmetatable(_G.__SEL, { __index = function(t, k)
-    if k == "ui" then return ui() end
-    return nil
-end })
-
-local entry, why = pick()
-
-local function mayStart()
-    if not VIA_QUEUE then return true end
-    if AUTOLOAD then return true end
-    return entry ~= nil and FROM ~= nil and FROM ~= ""
-        and tostring(entry.alias) == FROM
-end
-
-if not mayStart() then
-    local what = entry and (entry.name or entry.alias) or "no script"
-    print("[pixelhub] auto-start is off — " .. tostring(what) .. " not started.")
-    print("[pixelhub] execute o loadstring para iniciar aqui.")
-elseif entry then
-    loadGame(entry, why)
-else
-    local uni = byAlias("universal")
-    if not (uni and loadGame(uni, "fallback")) then picker() end
-end
+-- Se não houver chave salva, exibe a interface
+buildKeySystemUI(startHub)
